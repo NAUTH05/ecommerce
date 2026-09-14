@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.playwright-cli/
+.env
+.env.*
+!.env.example
+*firebase-adminsdk*.json
+*service-account*.json
+*serviceAccount*.json
+*.pem
+*.key
+*.log
+.firebase/

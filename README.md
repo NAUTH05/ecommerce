@@ -98,7 +98,13 @@ pm2 start ecosystem.config.cjs --env production
 pm2 save
 ```
 
-The PM2 app serves `dist` on port `4173` and passes `FIREBASE_ADMIN_CREDENTIALS` to its process. It does not expose the JSON or turn Admin SDK code into frontend code. Update the fallback path in `ecosystem.config.cjs` or set the environment variable before starting PM2 when the VPS uses another location.
+The PM2 app serves `dist` on port `7000` and passes `FIREBASE_ADMIN_CREDENTIALS` to its process. The port is passed explicitly to Vite with `--port 7000`; changing only `PORT` does not change Vite's listen port. It does not expose the JSON or turn Admin SDK code into frontend code. Update the fallback path in `ecosystem.config.cjs` or set the environment variable before starting PM2 when the VPS uses another location.
+
+For local Vite development, the PM2 ecosystem file is not used. Start the dev server on port `7000` with:
+
+```powershell
+npm run dev -- --port 7000
+```
 
 ## Seed sample data
 

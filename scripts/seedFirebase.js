@@ -2,7 +2,17 @@ import { FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "./lib/firebaseAdmin.js";
 import { categories, products } from "./lib/seedData.js";
 
-const existing = await adminDb.collection("products").limit(1).get();
+let existing;
+try {
+  existing = await adminDb.collection("products").limit(1).get();
+} catch (error) {
+  if (error.code === 7 && error.reason === "SERVICE_DISABLED") {
+    throw new Error(
+      "Cloud Firestore is disabled for this Firebase project. Enable the Cloud Firestore API in Google Cloud, create a Firestore database, then run npm run firebase:seed again."
+    );
+  }
+  throw error;
+}
 if (!existing.empty) {
   console.log("Products already exist; nothing overwritten.");
   process.exit(0);

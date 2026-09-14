@@ -62,6 +62,8 @@ The service-account JSON is a secret. Never commit it, place it in `dist/` or `p
 
    `firebase:admin` updates only the target user's Firestore profile to `role: admin`; it does not create or change passwords.
 
+   If a script reports `SERVICE_DISABLED`, open the Google Cloud API page for the project, enable **Cloud Firestore API**, create the Firestore database in the Firebase console, and run the script again. Admin SDK credentials can be valid even while the Firestore API is disabled.
+
 ### Linux VPS
 
 Store the credential outside the publicly served project directory:

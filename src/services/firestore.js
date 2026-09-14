@@ -23,11 +23,15 @@ export const sampleProducts=[
 export async function getCategories(){ const s=await getDocs(collection(db,'categories')); return s.empty?sampleCategories:s.docs.map(d=>({id:d.id,...d.data()})); }
 export async function getProducts(){ const s=await getDocs(collection(db,'products')); return s.empty?sampleProducts:s.docs.map(d=>({id:d.id,...d.data()})); }
 export async function getProduct(id){ const s=await getDoc(doc(db,'products',id)); return s.exists()?{id:s.id,...s.data()}:sampleProducts.find(p=>p.id===id); }
+export async function getManagedCategories(){ const s=await getDocs(collection(db,'categories')); return s.docs.map(d=>({id:d.id,...d.data()})); }
+export async function getManagedProducts(){ const s=await getDocs(collection(db,'products')); return s.docs.map(d=>({id:d.id,...d.data()})); }
+export async function getManagedProduct(id){ const s=await getDoc(doc(db,'products',id)); return s.exists()?{id:s.id,...s.data()}:null; }
 export async function getCart(uid){ const s=await getDocs(collection(db,'carts',uid,'items')); return s.docs.map(d=>({id:d.id,...d.data()})); }
 export async function saveCartItem(uid,item){ await setDoc(doc(db,'carts',uid,'items',item.productId),{...item,updatedAt:serverTimestamp()}); }
 export async function removeCartItem(uid,id){ await deleteDoc(doc(db,'carts',uid,'items',id)); }
 export async function clearCart(uid){ const s=await getDocs(collection(db,'carts',uid,'items')); const b=writeBatch(db); s.forEach(d=>b.delete(d.ref)); await b.commit(); }
 export async function getOrders(uid,isAdmin=false){ const q=isAdmin?query(collection(db,'orders'),orderBy('createdAt','desc')):query(collection(db,'orders'),where('userId','==',uid),orderBy('createdAt','desc')); const s=await getDocs(q); return s.docs.map(d=>({id:d.id,...d.data()})); }
+export async function getOrder(id){ const s=await getDoc(doc(db,'orders',id)); return s.exists()?{id:s.id,...s.data()}:null; }
 export async function createOrder({user,items,shipping,paymentMethod}){
  const orderRef=doc(collection(db,'orders'));
  await runTransaction(db,async tx=>{
@@ -49,6 +53,7 @@ export async function createOrder({user,items,shipping,paymentMethod}){
 export async function upsertProduct(p){ const id=p.id||undefined; const ref=id?doc(db,'products',id):doc(collection(db,'products')); await setDoc(ref,{...p,id:ref.id,updatedAt:serverTimestamp(),createdAt:p.createdAt||serverTimestamp()}); return ref.id; }
 export async function deleteProduct(id){ await deleteDoc(doc(db,'products',id)); }
 export async function upsertCategory(c){ const ref=c.id?doc(db,'categories',c.id):doc(collection(db,'categories')); await setDoc(ref,{name:c.name,icon:c.icon||'◈',updatedAt:serverTimestamp(),createdAt:c.createdAt||serverTimestamp()},{merge:true}); return ref.id; }
-export async function deleteCategory(id){ await deleteDoc(doc(db,'categories',id)); }
-export async function updateOrderStatus(id,status){ await updateDoc(doc(db,'orders',id),{status,updatedAt:serverTimestamp()}); }
+export async function deleteCategory(id){ const products=await getManagedProducts(); if(products.some(product=>product.categoryId===id)) throw new Error('Cannot delete category because products are using it.'); await deleteDoc(doc(db,'categories',id)); }
+export const orderStatuses=['Pending','Confirmed','Shipping','Completed','Cancelled'];
+export async function updateOrderStatus(id,status){ if(!orderStatuses.includes(status)) throw new Error('Invalid order status.'); await updateDoc(doc(db,'orders',id),{status,updatedAt:serverTimestamp()}); }
 export async function getUsers(){ const s=await getDocs(collection(db,'users')); return s.docs.map(d=>({id:d.id,...d.data()})); }

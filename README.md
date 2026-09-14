@@ -118,6 +118,33 @@ It creates four categories and sixteen products, including varied prices, low-st
 
 The frontend never lets a customer choose or update their role. `firestore.rules` also prevents customer role changes and protects product/category administration.
 
+## Admin Flow
+
+The admin flow is part of the existing React application and is protected by both the frontend route guard and Firestore Security Rules. A user must be signed in and have `role: "admin"` in `users/{uid}`. Customers cannot change their own role or write products, categories, orders, or other users.
+
+### Admin routes
+
+- `/admin` — dashboard totals, recent orders, and low/out-of-stock products
+- `/admin/products` — search, category filter, create link, edit, and confirmed delete
+- `/admin/products/new` — validated product creation
+- `/admin/products/:id/edit` — validated product editing while preserving the product ID
+- `/admin/categories` — add, edit, search-free list, duplicate-name validation, and protected delete
+- `/admin/orders` — search, status filter, status updates, and order detail links
+- `/admin/orders/:id` — customer, shipping, payment, items, total, date, and status
+- `/admin/users` — search and basic customer/role/account information
+
+The admin sidebar includes Dashboard, Products, Categories, Orders, Users, Back to Store, and Logout. Admin operations show observable success or error messages, including invalid product values, duplicate categories, category references, invalid statuses, and denied access.
+
+### Development workflow
+
+```powershell
+npm install
+npm run dev
+npm run firebase:admin -- --email admin@example.com
+```
+
+After signing out and in again, open `/admin`. Manual test cases can cover guest/customer/admin route access, product CRUD and validation, category reference protection, order search/details/status updates, user search, and attempted customer role escalation. The `firebase:admin` command is the only documented role-promotion path and runs with the trusted Firebase Admin SDK from Node.js.
+
 ## Firestore collections
 
 - `users/{uid}` — profile, email, role, phone, address, timestamps

@@ -15,7 +15,11 @@ service cloud.firestore {
     match /users/{uid} {
       allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
       allow create: if signedIn() && request.auth.uid == uid && request.resource.data.role == 'customer';
-      allow update: if signedIn() && ((request.auth.uid == uid && request.resource.data.uid == resource.data.uid && request.resource.data.role == resource.data.role) || isAdmin());
+      allow update: if isAdmin() || (signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fullName', 'phone', 'address', 'updatedAt']));
       allow delete: if isAdmin();
     }
     match /carts/{uid}/items/{itemId} { allow read, write, delete: if signedIn() && request.auth.uid == uid; }

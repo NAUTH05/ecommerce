@@ -39,6 +39,15 @@ The React frontend uses the Firebase Client SDK and `VITE_FIREBASE_*` variables.
    firebase deploy --only firestore:rules,firestore:indexes
    ```
 
+   If the browser reports `Missing or insufficient permissions`, deploy the repository rules while signed in with a Firebase user that has permission to manage the project:
+
+   ```powershell
+   npx firebase-tools login
+   npx firebase-tools deploy --only firestore:rules,firestore:indexes --project ecommerce-121c8
+   ```
+
+   The Admin service account may read/write Firestore while still lacking permission to deploy Firebase configuration. Use your Firebase CLI account for this deployment step.
+
 ## Firebase Admin SDK Setup
 
 The service-account JSON is a secret. Never commit it, place it in `dist/` or `public/`, expose it through a `VITE_*` variable, or print its contents. If a key is exposed, revoke and regenerate it in Firebase / Google Cloud.

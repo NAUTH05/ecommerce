@@ -10,7 +10,8 @@
     "seed": "node scripts/seedFirebase.js",
     "firebase:seed": "node scripts/seedFirebase.js",
     "firebase:admin": "node scripts/setupAdmin.js",
-    "firebase:reset-test-data": "node scripts/resetTestData.js --confirm"
+    "firebase:reset-test-data": "node scripts/resetTestData.js --confirm",
+    "firebase:deploy": "npx firebase-tools deploy --only firestore:rules,firestore:indexes"
   },
   "dependencies": {
     "dotenv": "^16.4.5",

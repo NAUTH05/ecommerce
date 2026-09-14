@@ -9,6 +9,8 @@ A deliberately manageable React/Vite + Firebase e-commerce application for a Sof
 - Firebase Storage is configured but not required; product images use public URLs
 - Client-side catalog filtering/sorting; Firestore-backed carts and orders
 
+The React frontend uses the Firebase Client SDK and `VITE_FIREBASE_*` variables. Trusted maintenance scripts use the Firebase Admin SDK from `scripts/` only. The Admin SDK is never imported by `src/` and is not included in the Vite browser bundle.
+
 ## Windows setup
 
 1. Install Node.js 18+ from https://nodejs.org/.
@@ -37,12 +39,62 @@ A deliberately manageable React/Vite + Firebase e-commerce application for a Sof
    firebase deploy --only firestore:rules,firestore:indexes
    ```
 
+## Firebase Admin SDK Setup
+
+The service-account JSON is a secret. Never commit it, place it in `dist/` or `public/`, expose it through a `VITE_*` variable, or print its contents. If a key is exposed, revoke and regenerate it in Firebase / Google Cloud.
+
+### Local Windows
+
+1. Copy `.env.example` to `.env` and keep the existing `VITE_FIREBASE_*` values for the browser.
+2. Set the Node-only credential path in `.env`:
+
+   ```env
+   FIREBASE_ADMIN_CREDENTIALS=./ecommerce-firebase-adminsdk.json
+   ```
+
+   An absolute path is also supported, for example `C:/Users/User/project/ecommerce-firebase-adminsdk.json` or `C:\\Users\\User\\project\\ecommerce-firebase-adminsdk.json`.
+3. Run trusted scripts from the repository root:
+
+   ```powershell
+   npm run firebase:seed
+   npm run firebase:admin -- --email admin@example.com
+   ```
+
+   `firebase:admin` updates only the target user's Firestore profile to `role: admin`; it does not create or change passwords.
+
+### Linux VPS
+
+Store the credential outside the publicly served project directory:
+
+```bash
+sudo mkdir -p /opt/ecommerce/secrets
+sudo chmod 700 /opt/ecommerce/secrets
+sudo cp firebase-admin.json /opt/ecommerce/secrets/firebase-admin.json
+sudo chmod 600 /opt/ecommerce/secrets/firebase-admin.json
+export FIREBASE_ADMIN_CREDENTIALS=/opt/ecommerce/secrets/firebase-admin.json
+```
+
+Run `npm run build` before serving the static site. Admin scripts can then be run with the exported variable. Do not copy the service account into `dist/`, `public/`, or another downloadable directory.
+
+### PM2
+
+This repository has no Node application server; Firebase Hosting can serve `dist` directly. `ecosystem.config.cjs` is provided only when a VPS needs PM2 to keep Vite's production preview process alive:
+
+```bash
+export FIREBASE_ADMIN_CREDENTIALS=/opt/ecommerce/secrets/firebase-admin.json
+npm run build
+pm2 start ecosystem.config.cjs --env production
+pm2 save
+```
+
+The PM2 app serves `dist` on port `4173` and passes `FIREBASE_ADMIN_CREDENTIALS` to its process. It does not expose the JSON or turn Admin SDK code into frontend code. Update the fallback path in `ecosystem.config.cjs` or set the environment variable before starting PM2 when the VPS uses another location.
+
 ## Seed sample data
 
 The seed script is intentionally non-destructive: it stops when products already exist.
 
 ```powershell
-npm run seed
+npm run firebase:seed
 ```
 
 It creates four categories and sixteen products, including varied prices, low-stock products, and one out-of-stock product. To reset a test project, remove its product/category documents in the Firebase console and run the seed again.
@@ -50,7 +102,7 @@ It creates four categories and sixteen products, including varied prices, low-st
 ## Admin setup
 
 1. Register an account through the website (this always creates a `customer`).
-2. In Firestore, open `users/{uid}` for that account and change only `role` to `admin` from the Firebase console or a trusted initialization script. Never expose passwords or Admin SDK credentials in this repository.
+2. Run `npm run firebase:admin -- --email admin@example.com` from a trusted Node environment, or use `--uid FIREBASE_UID`.
 3. Sign out/in again; the Admin link appears after the profile is reloaded.
 
 The frontend never lets a customer choose or update their role. `firestore.rules` also prevents customer role changes and protects product/category administration.
@@ -73,5 +125,15 @@ See `docs/testing/TESTING_GUIDE.md`, `TEST_CASE_TEMPLATE.md`, and `BUG_REPORT_TE
 
 - Product image upload is not implemented; public image URLs are used to keep the project small.
 - No real payment gateway, email verification, password reset, or automated tests.
-- The seed utility uses the browser-compatible Firebase SDK and should be run only against a disposable development/test project.
+- The seed and maintenance utilities use Firebase Admin SDK credentials and should be run only from a trusted environment, preferably against a disposable development/test project.
 - Firestore queries may ask for the included composite index on first use; deploy `firestore.indexes.json` as shown above.
+
+## Trusted maintenance commands
+
+```powershell
+npm run firebase:seed
+npm run firebase:admin -- --email admin@example.com
+npm run firebase:reset-test-data -- --confirm
+```
+
+`firebase:reset-test-data` deletes test orders and carts, replaces products and categories with the seed data, and preserves all Firebase Authentication users. It requires `--confirm` and never runs during application startup.

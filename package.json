@@ -7,11 +7,15 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "seed": "node scripts/seedFirebase.js"
+    "seed": "node scripts/seedFirebase.js",
+    "firebase:seed": "node scripts/seedFirebase.js",
+    "firebase:admin": "node scripts/setupAdmin.js",
+    "firebase:reset-test-data": "node scripts/resetTestData.js --confirm"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
     "firebase": "^10.12.2",
+    "firebase-admin": "^13.5.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.24.1"

@@ -9,24 +9,30 @@ export function AuthProvider({children}) {
   useEffect(()=>{
     if(!firebaseConfigured){ setLoading(false); return; }
     let mounted=true;
+    let currentUid=null;
     const unsubscribe=onAuthStateChanged(auth, async u=>{
       if(!mounted)return;
+      currentUid=u?u.uid:null;
       setUser(u);
       setError('');
+      if(!u){
+        setProfile(null);
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
       try{
-        if(u && firebaseConfigured){
-          const snap=await getDoc(doc(db,'users',u.uid));
-          if(mounted)setProfile(snap.exists()?snap.data():null);
-        }else if(mounted)setProfile(null);
+        const snap=await getDoc(doc(db,'users',u.uid));
+        if(!mounted||currentUid!==u.uid)return;
+        setProfile(snap.exists()?snap.data():null);
       }catch(error){
-        if(mounted){
-          setProfile(null);
-          setError(error.code==='permission-denied'
-            ? 'Your account is signed in, but Firestore rules are not allowing profile access. Deploy firestore.rules, then refresh.'
-            : 'Unable to load your account profile. Check the Firebase connection and try again.');
-        }
+        if(!mounted||currentUid!==u.uid)return;
+        setProfile(null);
+        setError(error.code==='permission-denied'
+          ? 'Your account is signed in, but Firestore rules are not allowing profile access. Deploy firestore.rules, then refresh.'
+          : 'Unable to load your account profile. Check the Firebase connection and try again.');
       }finally{
-        if(mounted)setLoading(false);
+        if(mounted&&currentUid===u.uid)setLoading(false);
       }
     });
     return()=>{mounted=false;unsubscribe()};

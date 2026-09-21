@@ -5,8 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "npm run env:check && vite build",
     "preview": "vite preview",
+    "env:check": "node scripts/validateEnv.js",
+    "env:check:admin": "node scripts/validateEnv.js --admin",
     "seed": "node scripts/seedFirebase.js",
     "firebase:seed": "node scripts/seedFirebase.js",
     "firebase:admin": "node scripts/setupAdmin.js",

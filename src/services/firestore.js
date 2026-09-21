@@ -1,6 +1,8 @@
 import { collection, doc, getDocs, getDoc, addDoc, setDoc, updateDoc, deleteDoc, query, where, orderBy, serverTimestamp, writeBatch, runTransaction } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
+const requireDb=()=>{ if(!db) throw new Error('Firebase is not configured. Add the VITE_FIREBASE_* values to the root .env, run npm run build, then reload.'); return db; };
+
 export const sampleCategories=[{id:'electronics',name:'Electronics',icon:'◈'},{id:'fashion',name:'Fashion',icon:'✦'},{id:'accessories',name:'Accessories',icon:'◇'},{id:'home',name:'Home',icon:'⌂'}];
 export const sampleProducts=[
  {id:'p1',name:'Aurora Wireless Headphones',description:'Immersive over-ear sound with 30-hour battery life.',price:89.99,stock:12,categoryId:'electronics',categoryName:'Electronics',imageUrl:'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=900'},
@@ -20,28 +22,29 @@ export const sampleProducts=[
  {id:'p15',name:'Desk Lamp No. 4',description:'Warm dimmable light for focused evenings.',price:84,stock:6,categoryId:'home',categoryName:'Home',imageUrl:'https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=900'},
  {id:'p16',name:'Canvas Cap',description:'Unstructured cotton cap with adjustable strap.',price:26,stock:16,categoryId:'fashion',categoryName:'Fashion',imageUrl:'https://images.unsplash.com/photo-1521369909029-2afed882baee?w=900'}
 ];
-export async function getCategories(){ const s=await getDocs(collection(db,'categories')); return s.empty?sampleCategories:s.docs.map(d=>({id:d.id,...d.data()})); }
-export async function getProducts(){ const s=await getDocs(collection(db,'products')); return s.empty?sampleProducts:s.docs.map(d=>({id:d.id,...d.data()})); }
-export async function getProduct(id){ const s=await getDoc(doc(db,'products',id)); return s.exists()?{id:s.id,...s.data()}:sampleProducts.find(p=>p.id===id); }
-export async function getManagedCategories(){ const s=await getDocs(collection(db,'categories')); return s.docs.map(d=>({id:d.id,...d.data()})); }
-export async function getManagedProducts(){ const s=await getDocs(collection(db,'products')); return s.docs.map(d=>({id:d.id,...d.data()})); }
-export async function getManagedProduct(id){ const s=await getDoc(doc(db,'products',id)); return s.exists()?{id:s.id,...s.data()}:null; }
-export async function getCart(uid){ const s=await getDocs(collection(db,'carts',uid,'items')); return s.docs.map(d=>({id:d.id,...d.data()})); }
-export async function saveCartItem(uid,item){ await setDoc(doc(db,'carts',uid,'items',item.productId),{...item,updatedAt:serverTimestamp()}); }
-export async function removeCartItem(uid,id){ await deleteDoc(doc(db,'carts',uid,'items',id)); }
-export async function clearCart(uid){ const s=await getDocs(collection(db,'carts',uid,'items')); const b=writeBatch(db); s.forEach(d=>b.delete(d.ref)); await b.commit(); }
-export async function getOrders(uid,isAdmin=false){ const q=isAdmin?query(collection(db,'orders'),orderBy('createdAt','desc')):query(collection(db,'orders'),where('userId','==',uid),orderBy('createdAt','desc')); const s=await getDocs(q); return s.docs.map(d=>({id:d.id,...d.data()})); }
-export async function getOrder(id){ const s=await getDoc(doc(db,'orders',id)); return s.exists()?{id:s.id,...s.data()}:null; }
+export async function getCategories(){ if(!db) return sampleCategories; const s=await getDocs(collection(db,'categories')); return s.empty?sampleCategories:s.docs.map(d=>({id:d.id,...d.data()})); }
+export async function getProducts(){ if(!db) return sampleProducts; const s=await getDocs(collection(db,'products')); return s.empty?sampleProducts:s.docs.map(d=>({id:d.id,...d.data()})); }
+export async function getProduct(id){ if(!db) return sampleProducts.find(p=>p.id===id)||null; const s=await getDoc(doc(db,'products',id)); return s.exists()?{id:s.id,...s.data()}:sampleProducts.find(p=>p.id===id); }
+export async function getManagedCategories(){ if(!db) return []; const s=await getDocs(collection(db,'categories')); return s.docs.map(d=>({id:d.id,...d.data()})); }
+export async function getManagedProducts(){ if(!db) return []; const s=await getDocs(collection(db,'products')); return s.docs.map(d=>({id:d.id,...d.data()})); }
+export async function getManagedProduct(id){ if(!db) return null; const s=await getDoc(doc(db,'products',id)); return s.exists()?{id:s.id,...s.data()}:null; }
+export async function getCart(uid){ if(!db) return []; const s=await getDocs(collection(db,'carts',uid,'items')); return s.docs.map(d=>({id:d.id,...d.data()})); }
+export async function saveCartItem(uid,item){ const firestore=requireDb(); await setDoc(doc(firestore,'carts',uid,'items',item.productId),{...item,updatedAt:serverTimestamp()}); }
+export async function removeCartItem(uid,id){ const firestore=requireDb(); await deleteDoc(doc(firestore,'carts',uid,'items',id)); }
+export async function clearCart(uid){ const firestore=requireDb(); const s=await getDocs(collection(firestore,'carts',uid,'items')); const b=writeBatch(firestore); s.forEach(d=>b.delete(d.ref)); await b.commit(); }
+export async function getOrders(uid,isAdmin=false){ if(!db) return []; const q=isAdmin?query(collection(db,'orders'),orderBy('createdAt','desc')):query(collection(db,'orders'),where('userId','==',uid),orderBy('createdAt','desc')); const s=await getDocs(q); return s.docs.map(d=>({id:d.id,...d.data()})); }
+export async function getOrder(id){ if(!db) return null; const s=await getDoc(doc(db,'orders',id)); return s.exists()?{id:s.id,...s.data()}:null; }
 export async function createOrder({user,items,shipping,paymentMethod}){
- const orderRef=doc(collection(db,'orders'));
- await runTransaction(db,async tx=>{
+ const firestore=requireDb();
+ const orderRef=doc(collection(firestore,'orders'));
+ await runTransaction(firestore,async tx=>{
    const live=[];
    for(const item of items){
-     const productRef=doc(db,'products',item.productId), snap=await tx.get(productRef);
+     const productRef=doc(firestore,'products',item.productId), snap=await tx.get(productRef);
      if(!snap.exists()) throw new Error(`${item.productName} is no longer available.`);
      const product={id:snap.id,...snap.data()};
      if(product.stock<item.quantity) throw new Error(`Only ${product.stock} unit(s) of ${product.name} are available.`);
-     live.push({productRef,cartRef:doc(db,'carts',user.uid,'items',item.productId),product,quantity:item.quantity});
+     live.push({productRef,cartRef:doc(firestore,'carts',user.uid,'items',item.productId),product,quantity:item.quantity});
    }
    const orderItems=live.map(({product,quantity})=>({productId:product.id,productName:product.name,price:Number(product.price),quantity,imageUrl:product.imageUrl||''}));
    const total=orderItems.reduce((sum,item)=>sum+item.price*item.quantity,0);
@@ -50,10 +53,10 @@ export async function createOrder({user,items,shipping,paymentMethod}){
  });
  return orderRef.id;
 }
-export async function upsertProduct(p){ const id=p.id||undefined; const ref=id?doc(db,'products',id):doc(collection(db,'products')); await setDoc(ref,{...p,id:ref.id,updatedAt:serverTimestamp(),createdAt:p.createdAt||serverTimestamp()}); return ref.id; }
-export async function deleteProduct(id){ await deleteDoc(doc(db,'products',id)); }
-export async function upsertCategory(c){ const ref=c.id?doc(db,'categories',c.id):doc(collection(db,'categories')); await setDoc(ref,{name:c.name,icon:c.icon||'◈',updatedAt:serverTimestamp(),createdAt:c.createdAt||serverTimestamp()},{merge:true}); return ref.id; }
-export async function deleteCategory(id){ const products=await getManagedProducts(); if(products.some(product=>product.categoryId===id)) throw new Error('Cannot delete category because products are using it.'); await deleteDoc(doc(db,'categories',id)); }
+export async function upsertProduct(p){ const firestore=requireDb(); const id=p.id||undefined; const ref=id?doc(firestore,'products',id):doc(collection(firestore,'products')); await setDoc(ref,{...p,id:ref.id,updatedAt:serverTimestamp(),createdAt:p.createdAt||serverTimestamp()}); return ref.id; }
+export async function deleteProduct(id){ const firestore=requireDb(); await deleteDoc(doc(firestore,'products',id)); }
+export async function upsertCategory(c){ const firestore=requireDb(); const ref=c.id?doc(firestore,'categories',c.id):doc(collection(firestore,'categories')); await setDoc(ref,{name:c.name,icon:c.icon||'◈',updatedAt:serverTimestamp(),createdAt:c.createdAt||serverTimestamp()},{merge:true}); return ref.id; }
+export async function deleteCategory(id){ const firestore=requireDb(); const products=await getManagedProducts(); if(products.some(product=>product.categoryId===id)) throw new Error('Cannot delete category because products are using it.'); await deleteDoc(doc(firestore,'categories',id)); }
 export const orderStatuses=['Pending','Confirmed','Shipping','Completed','Cancelled'];
-export async function updateOrderStatus(id,status){ if(!orderStatuses.includes(status)) throw new Error('Invalid order status.'); await updateDoc(doc(db,'orders',id),{status,updatedAt:serverTimestamp()}); }
-export async function getUsers(){ const s=await getDocs(collection(db,'users')); return s.docs.map(d=>({id:d.id,...d.data()})); }
+export async function updateOrderStatus(id,status){ const firestore=requireDb(); if(!orderStatuses.includes(status)) throw new Error('Invalid order status.'); await updateDoc(doc(firestore,'orders',id),{status,updatedAt:serverTimestamp()}); }
+export async function getUsers(){ if(!db) return []; const s=await getDocs(collection(db,'users')); return s.docs.map(d=>({id:d.id,...d.data()})); }

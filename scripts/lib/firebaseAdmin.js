@@ -1,9 +1,13 @@
-import "dotenv/config";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+import dotenv from "dotenv";
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
+
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+dotenv.config({ path: path.resolve(repoRoot, ".env"), quiet: true });
 
 function getCredentialsPath() {
   const configuredPath = process.env.FIREBASE_ADMIN_CREDENTIALS?.trim();
@@ -14,7 +18,7 @@ function getCredentialsPath() {
   }
   return path.isAbsolute(configuredPath)
     ? configuredPath
-    : path.resolve(process.cwd(), configuredPath);
+    : path.resolve(repoRoot, configuredPath);
 }
 
 function readServiceAccount() {

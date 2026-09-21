@@ -7,6 +7,7 @@ const AuthContext = createContext(null);
 export function AuthProvider({children}) {
   const [user,setUser]=useState(null), [profile,setProfile]=useState(null), [loading,setLoading]=useState(true), [error,setError]=useState('');
   useEffect(()=>{
+    if(!firebaseConfigured){ setLoading(false); return; }
     let mounted=true;
     const unsubscribe=onAuthStateChanged(auth, async u=>{
       if(!mounted)return;

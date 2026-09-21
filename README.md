@@ -11,6 +11,40 @@ A deliberately manageable React/Vite + Firebase e-commerce application for a Sof
 
 The React frontend uses the Firebase Client SDK and `VITE_FIREBASE_*` variables. Trusted maintenance scripts use the Firebase Admin SDK from `scripts/` only. The Admin SDK is never imported by `src/` and is not included in the Vite browser bundle.
 
+## Environment configuration
+
+A single root-level `.env` file is the only source of environment-specific configuration for both local development and the VPS. It is git-ignored; `.env.example` is the tracked template.
+
+There are two independent pipelines that read `.env`:
+
+```text
+.env --(npm run build / Vite, build time)--> VITE_FIREBASE_* embedded in dist/ --> Firebase Client SDK (browser)
+.env --(dotenv, runtime)-------------------> FIREBASE_ADMIN_CREDENTIALS -------> Firebase Admin SDK (scripts/)
+.env --(dotenv in ecosystem.config.cjs)---> PORT / HOST / FIREBASE_ADMIN_CREDENTIALS --> PM2 (vite preview)
+```
+
+| Variable | Used by | Notes |
+| --- | --- | --- |
+| `VITE_FIREBASE_API_KEY` | Browser (Vite) | Embedded at build time |
+| `VITE_FIREBASE_AUTH_DOMAIN` | Browser (Vite) | Embedded at build time |
+| `VITE_FIREBASE_PROJECT_ID` | Browser (Vite) | Embedded at build time |
+| `VITE_FIREBASE_STORAGE_BUCKET` | Browser (Vite) | Embedded at build time |
+| `VITE_FIREBASE_MESSAGING_SENDER_ID` | Browser (Vite) | Embedded at build time |
+| `VITE_FIREBASE_APP_ID` | Browser (Vite) | Embedded at build time |
+| `FIREBASE_ADMIN_CREDENTIALS` | Node scripts | Path to service-account JSON, never prefixed with `VITE_` |
+| `HOST` | PM2 / `vite preview` | Defaults to `0.0.0.0` |
+| `PORT` | PM2 / `vite preview` | Defaults to `7000` |
+
+> **IMPORTANT — Vite variables are resolved at BUILD time.**
+> `VITE_FIREBASE_*` values are replaced inside the generated JavaScript during `npm run build`. Editing `.env` and then only restarting PM2 (`pm2 restart ecommerce`) does **not** update an already-built `dist/`. After changing any `VITE_*` value you **must** run `npm run build` again, then restart PM2.
+
+Validate the environment at any time (prints names and status only, never values):
+
+```powershell
+npm run env:check          # browser/Vite variables
+npm run env:check:admin    # also checks FIREBASE_ADMIN_CREDENTIALS exists
+```
+
 ## Windows setup
 
 1. Install Node.js 18+ from https://nodejs.org/.
@@ -28,6 +62,7 @@ The React frontend uses the Firebase Client SDK and `VITE_FIREBASE_*` variables.
 
    ```powershell
    npm install
+   npm run env:check
    npm run dev
    ```
 
@@ -75,32 +110,73 @@ The service-account JSON is a secret. Never commit it, place it in `dist/` or `p
 
 ### Linux VPS
 
-Store the credential outside the publicly served project directory:
+Keep the service-account JSON outside the served project directory and point `.env` at it:
 
 ```bash
 sudo mkdir -p /opt/ecommerce/secrets
 sudo chmod 700 /opt/ecommerce/secrets
 sudo cp firebase-admin.json /opt/ecommerce/secrets/firebase-admin.json
 sudo chmod 600 /opt/ecommerce/secrets/firebase-admin.json
-export FIREBASE_ADMIN_CREDENTIALS=/opt/ecommerce/secrets/firebase-admin.json
 ```
 
-Run `npm run build` before serving the static site. Admin scripts can then be run with the exported variable. Do not copy the service account into `dist/`, `public/`, or another downloadable directory.
+```env
+# /opt/ecommerce/.env
+FIREBASE_ADMIN_CREDENTIALS=/opt/ecommerce/secrets/firebase-admin.json
+```
+
+Relative paths in `FIREBASE_ADMIN_CREDENTIALS` are resolved from the repository root, so `./ecommerce-firebase-adminsdk.json` works when the JSON lives next to `package.json`. Do not copy the service account into `dist/`, `public/`, or another downloadable directory.
+
+### Deployment (first install)
+
+```bash
+git clone https://github.com/NAUTH05/ecommerce.git
+cd ecommerce
+npm install
+cp .env.example .env
+nano .env          # fill in VITE_FIREBASE_* and FIREBASE_ADMIN_CREDENTIALS
+
+npm run env:check  # verify client variables (and env:check:admin for Admin)
+npm run build      # bakes VITE_FIREBASE_* into dist/
+```
 
 ### PM2
 
-This repository has no Node application server; Firebase Hosting can serve `dist` directly. `ecosystem.config.cjs` is provided only when a VPS needs PM2 to keep Vite's production preview process alive:
+`ecosystem.config.cjs` loads the root `.env` itself (`dotenv` + `path`), so `PORT`, `HOST`, and `FIREBASE_ADMIN_CREDENTIALS` come from `.env` — you do not need to `export` anything before starting PM2:
 
 ```bash
-export FIREBASE_ADMIN_CREDENTIALS=/opt/ecommerce/secrets/firebase-admin.json
-npm run build
+npm install -g pm2
 pm2 start ecosystem.config.cjs --env production
 pm2 save
 ```
 
-The PM2 app serves `dist` on port `7000` and passes `FIREBASE_ADMIN_CREDENTIALS` to its process. The port is passed explicitly to Vite with `--port 7000`; changing only `PORT` does not change Vite's listen port. It does not expose the JSON or turn Admin SDK code into frontend code. Update the fallback path in `ecosystem.config.cjs` or set the environment variable before starting PM2 when the VPS uses another location.
+The PM2 app runs `vite preview --host <HOST> --port <PORT>` in the repository root and serves the already-built `dist/`. It does not rebuild the project and does not expose the Admin JSON to the browser.
 
-For local Vite development, the PM2 ecosystem file is not used. Start the dev server on port `7000` with:
+### Updating the deployment
+
+```bash
+git pull
+npm install
+npm run build
+pm2 restart ecosystem.config.cjs --env production --update-env
+pm2 save
+```
+
+If **only** `VITE_FIREBASE_*` values changed, PM2 alone is not enough because those values live inside the built bundle:
+
+```bash
+npm run build
+pm2 restart ecosystem.config.cjs --env production --update-env
+```
+
+### Debug commands
+
+```bash
+pm2 status
+pm2 logs ecommerce --lines 100
+npm run env:check
+```
+
+For local Vite development, the PM2 ecosystem file is not used. Start the dev server with:
 
 ```powershell
 npm run dev -- --port 7000
